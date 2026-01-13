@@ -1,0 +1,42 @@
+// النسخة الاحتياطية من تصميم صورة الملف الشخصي - Profile.tsx
+// التاريخ: 2026-01-09
+// السطور: 190-226
+
+{/* التصميم القديم */}
+<div className="relative inline-block mb-3">
+    <div
+        className="w-32 h-32 rounded-full border-4 border-background shadow-2xl overflow-hidden bg-background relative cursor-pointer hover:scale-105 transition-transform duration-300"
+        onClick={() => setIsPreviewOpen(true)}
+    >
+        {isUploading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <Loader2 className="w-10 h-10 text-white animate-spin" />
+            </div>
+        ) : (
+            <img
+                src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}&background=random&size=256`}
+                alt={user.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.name}&background=random&size=256`;
+                }}
+            />
+        )}
+    </div>
+    <button
+        onClick={(e) => {
+            e.stopPropagation();
+            fileInputRef.current?.click();
+        }}
+        className="absolute bottom-1 right-1 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all hover:scale-110 z-10 border-2 border-background"
+    >
+        <Camera className="w-5 h-5" />
+    </button>
+    <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+    />
+</div>

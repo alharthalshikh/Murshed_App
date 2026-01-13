@@ -1,0 +1,25 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+        <path d="M2,2 L10,6 L2,10 L2,2" fill="black" />
+      </marker>
+      <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+        <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#F5F5F5" stroke-width="2"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="white"/>
+    <rect width="100%" height="100%" fill="url(#grid)"/>
+   
+        <!-- Top Input Path -->
+        <path d="M 200 250 C 600 250, 560 540, 960 540" fill="none" stroke="black" stroke-width="3"/>
+        <!-- Bottom Input Path -->
+        <path d="M 200 830 C 600 830, 560 540, 960 540" fill="none" stroke="black" stroke-width="3"/>
+        <!-- Output Path -->
+        <line x1="960" y1="540" x2="1700" y2="540" stroke="black" stroke-width="5" marker-end="url(#arrow)"/>
+     <circle cx="200" cy="250" r="15" fill="white" stroke="black" stroke-width="3"/><circle cx="352" cy="308" r="15" fill="white" stroke="black" stroke-width="3"/><circle cx="504" cy="366" r="15" fill="white" stroke="black" stroke-width="3"/><circle cx="656" cy="424" r="15" fill="white" stroke="black" stroke-width="3"/><circle cx="200" cy="830" r="15" fill="black"/><circle cx="352" cy="772" r="15" fill="black"/><circle cx="504" cy="714" r="15" fill="black"/><circle cx="656" cy="656" r="15" fill="black"/><circle cx="1040" cy="540" r="15" fill="black" stroke="black" stroke-width="0"/><circle cx="1160" cy="540" r="15" fill="white" stroke="black" stroke-width="3"/><circle cx="1280" cy="540" r="15" fill="black" stroke="black" stroke-width="0"/><circle cx="1400" cy="540" r="15" fill="white" stroke="black" stroke-width="3"/><circle cx="1520" cy="540" r="15" fill="black" stroke="black" stroke-width="0"/> 
+        <text x="200" y="210" font-family="Arial, sans-serif" font-weight="bold">INPUT_STREAM_A</text>
+        <text x="200" y="880" font-family="Arial, sans-serif" font-weight="bold">INPUT_STREAM_B</text>
+        <text x="1500" y="500" font-family="Arial, sans-serif" font-weight="bold">MERGED_DATA</text>
+     
+  
+  </svg>

@@ -1,55 +1,24 @@
-# Dependencies
+# Node / React / Vite
 node_modules/
-__pycache__/
-*.pyc
-.pyo
-.pyd
-venv/
-.venv/
-env/
-
-# Build output
 dist/
 build/
-.next/
 
-# Environment variables (IMPORTANT - contains secrets!)
+# Environment secrets
 .env
 .env.local
-.env.*.local
-
-# IDE and editor settings
-.vscode/
-.idea/
-*.swp
-*.swo
 
 # Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# Editor settings
+.vscode/
+.idea/
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# Debug/Test files
-debug_*.js
-debug_*.cjs
-debug_*.ts
-check_*.js
-check_*.cjs
-skip.js
-rebuild_images_db.js
-run_tables_migration.cjs
-
-# Backup files
-*.backup
-*.bak
-*_backup_*.txt
-profile_avatar_backup_old_design.txt
-
-# Cache
-.cache/
-.eslintcache
+# Python
+__pycache__/
+*.pyc
+venv/

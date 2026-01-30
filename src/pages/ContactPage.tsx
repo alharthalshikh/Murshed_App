@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/layout/Layout';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getContactInfo, ContactInfo } from '@/services/contactService';
-import { Loader2, Phone, Facebook, Instagram, Youtube, MessagesSquare, X } from 'lucide-react';
+import { getContactInfo, ContactInfo, getActiveContacts } from '@/services/contactService';
+import { Contact } from '@/types/contact';
+import { Loader2, Phone, Facebook, Instagram, Youtube, MessagesSquare, X, Mail, MessageCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/context/LanguageContext';
+import { cn } from '@/lib/utils';
 
 export default function ContactPage() {
-    const { t } = useLanguage();
+    const { t, resolvedLanguage } = useLanguage();
     const [isLoading, setIsLoading] = useState(true);
     const [info, setInfo] = useState<ContactInfo>({});
+    const [contacts, setContacts] = useState<Contact[]>([]);
     const [isImageOpen, setIsImageOpen] = useState(false);
 
     useEffect(() => {
@@ -20,13 +23,16 @@ export default function ContactPage() {
 
     const loadData = async () => {
         setIsLoading(true);
-        const data = await getContactInfo();
-        setInfo(data);
+        const [contactInfo, activeContacts] = await Promise.all([
+            getContactInfo(),
+            getActiveContacts()
+        ]);
+        setInfo(contactInfo);
+        setContacts(activeContacts);
         setIsLoading(false);
     };
 
     const SocialButton = ({ href, icon: Icon, label, colorClass }: { href?: string, icon: any, label: string, colorClass: string }) => {
-        // ... existing SocialButton code ...
         if (!href) return null;
         return (
             <a href={href} target="_blank" rel="noopener noreferrer" className="w-full block transform hover:-translate-y-1 transition-all duration-300">
@@ -39,7 +45,6 @@ export default function ContactPage() {
     };
 
     const WhatsAppButton = ({ number, label }: { number?: string, label: string }) => {
-        // ... existing WhatsAppButton code ...
         if (!number) return null;
         const href = `https://wa.me/${number.replace(/\D/g, '')}`;
         return (
@@ -52,10 +57,6 @@ export default function ContactPage() {
         );
     };
 
-    // ... (inside the component)
-
-    // ... (inside the component)
-
     if (isLoading) {
         return (
             <Layout>
@@ -64,21 +65,11 @@ export default function ContactPage() {
                         <Skeleton className="h-10 w-48 mx-auto" />
                         <Skeleton className="h-4 w-64 mx-auto" />
                     </div>
-
                     <div className="flex flex-col items-center gap-6 mb-8">
-                        {/* Avatar Skeleton */}
                         <Skeleton className="h-48 w-48 rounded-full border-4 border-white shadow-lg" />
-
-                        {/* Name Skeleton */}
-                        <div className="text-center -mt-4 space-y-2">
-                            <Skeleton className="h-8 w-40 mx-auto" />
-                            <Skeleton className="h-4 w-24 mx-auto" />
-                        </div>
-
-                        {/* Card Skeleton */}
                         <Card className="w-full border-t-8 border-t-primary/20 shadow-2xl rounded-3xl overflow-hidden">
                             <CardContent className="p-8 space-y-6">
-                                {[1, 2, 3, 4, 5].map((i) => (
+                                {[1, 2, 3].map((i) => (
                                     <Skeleton key={i} className="w-full h-14 rounded-2xl" />
                                 ))}
                             </CardContent>
@@ -91,13 +82,13 @@ export default function ContactPage() {
 
     return (
         <Layout>
-            <div className="container max-w-lg mx-auto py-8 px-4">
+            <div className="container max-w-4xl mx-auto py-8 px-4 mb-20">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold mb-2">{t('contact_us_title')}</h1>
                     <p className="text-muted-foreground">{t('contact_us_desc')}</p>
                 </div>
 
-                <div className="flex flex-col items-center gap-6 mb-8">
+                <div className="flex flex-col items-center gap-6 mb-16">
                     <Dialog open={isImageOpen} onOpenChange={setIsImageOpen}>
                         <DialogTrigger asChild>
                             <div className="h-48 w-48 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100 cursor-pointer transform hover:scale-105 transition-all duration-300 group relative">
@@ -136,7 +127,7 @@ export default function ContactPage() {
                         </div>
                     )}
 
-                    <Card className="border-t-8 border-t-primary shadow-2xl rounded-3xl overflow-hidden transform hover:scale-[1.02] transition-all duration-300">
+                    <Card className="w-full max-w-lg border-t-8 border-t-primary shadow-2xl rounded-3xl overflow-hidden transform hover:scale-[1.02] transition-all duration-300">
                         <CardContent className="p-8 space-y-6">
                             <WhatsAppButton number={info.whatsapp_number} label={t('contact_wa_label')} />
 
@@ -170,6 +161,91 @@ export default function ContactPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* --- New Team Contacts Section --- */}
+                {contacts.length > 0 && (
+                    <div className="space-y-8">
+                        <div className="text-center">
+                            <h2 className="text-2xl font-bold">{t('our_team') || 'Our Team'}</h2>
+                            <p className="text-muted-foreground">{t('contact_team_desc') || "Feel free to reach out to any of our team members."}</p>
+                        </div>
+
+                        <div className="grid gap-6 sm:grid-cols-2">
+                            {contacts.map((contact) => (
+                                <Card key={contact.id} className="hover:shadow-xl transition-all duration-300 overflow-hidden border-2 border-transparent hover:border-primary/10">
+                                    <CardContent className="p-6">
+                                        <div className="flex items-center gap-6">
+                                            {/* Avatar */}
+                                            <div className="h-20 w-20 rounded-full overflow-hidden border-2 border-primary/20 bg-muted shrink-0 shadow-md">
+                                                {contact.avatar_url ? (
+                                                    <img src={contact.avatar_url} alt={contact.full_name} className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary/40 font-bold text-2xl">
+                                                        {contact.full_name.charAt(0)}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0 space-y-2 text-right">
+                                                <h3 className="font-bold text-xl leading-tight text-foreground">{contact.full_name}</h3>
+                                                {contact.note && (
+                                                    <p className="text-sm text-muted-foreground">{contact.note}</p>
+                                                )}
+
+                                                {/* Social Links for Team Member */}
+                                                <div className="flex justify-start gap-2 pt-1">
+                                                    {contact.facebook_url && (
+                                                        <a href={contact.facebook_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                                                            <Facebook className="h-4 w-4" />
+                                                        </a>
+                                                    )}
+                                                    {contact.instagram_url && (
+                                                        <a href={contact.instagram_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors">
+                                                            <Instagram className="h-4 w-4" />
+                                                        </a>
+                                                    )}
+                                                    {contact.youtube_url && (
+                                                        <a href={contact.youtube_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors">
+                                                            <Youtube className="h-4 w-4" />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Quick Actions */}
+                                            <div className="flex flex-col gap-3 shrink-0">
+                                                <a href={`tel:${contact.phone}`} className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-green-100 text-green-600 hover:bg-green-200 shadow-sm transition-all active:scale-95">
+                                                    <Phone className="h-6 w-6" />
+                                                </a>
+                                                {contact.email && (
+                                                    <a href={`mailto:${contact.email}`} className="inline-flex items-center justify-center h-12 w-12 rounded-2xl bg-blue-100 text-blue-600 hover:bg-blue-200 shadow-sm transition-all active:scale-95">
+                                                        <Mail className="h-6 w-6" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                    {contact.phone && (
+                                        <div className="grid grid-cols-1 divide-x divide-muted border-t border-muted">
+                                            <a
+                                                href={`https://wa.me/${contact.phone.replace(/\D/g, '')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="block py-4 px-6 bg-primary/5 text-center text-sm font-bold text-primary hover:bg-primary/10 transition-colors"
+                                            >
+                                                <span className="flex items-center justify-center gap-2">
+                                                    <MessageCircle className="h-5 w-5" />
+                                                    {t('message_whatsapp') || "Message on WhatsApp"}
+                                                </span>
+                                            </a>
+                                        </div>
+                                    )}
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </Layout>
     );

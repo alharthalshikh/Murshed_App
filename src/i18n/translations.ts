@@ -402,6 +402,46 @@ export const translations = {
         save_contact_err: 'حدث خطأ أثناء الحفظ',
         upload_photo_success: 'تم رفع الصورة بنجاح',
         upload_photo_err: 'فشل رفع الصورة',
+        our_team: 'فريق العمل',
+        contact_team_desc: 'تواصل مع فريقنا لخدمتك',
+        message_whatsapp: 'مراسلة عبر واتساب',
+
+        // Contacts System
+        contacts_list: 'قائمة بيانات التواصل',
+        manage_team_contacts: 'إدارة جهات التواصل',
+        add_edit_contact_desc: 'إضافة أو تعديل بيانات التواصل الخاصة بالفريق',
+        no_contacts_found: 'لا توجد جهات اتصال حاليًا',
+        add_contact: 'إضافة جهة اتصال',
+        edit_contact: 'تعديل جهة الاتصال',
+        add_new_contact: 'إضافة جهة اتصال جديدة',
+        contact_deleted: 'تم حذف جهة الاتصال بنجاح',
+        error_deleting_contact: 'فشل حذف جهة الاتصال',
+        status_updated: 'تم تحديث الحالة بنجاح',
+        error_updating_status: 'فشل تحديث الحالة',
+        are_you_sure: 'هل أنت متأكد؟',
+        delete_contact_confirmation: 'هل أنت متأكد من حذف جهة الاتصال هذه؟ لا يمكن التراجع عن هذا الإجراء.',
+        active: 'نشط',
+        inactive: 'غير نشط',
+        deactivate: 'تعطيل',
+        actions: 'إجراءات',
+
+        // Form & Table fields
+        name_label: 'الاسم',
+
+        note_label: 'ملاحظات',
+        status_label: 'الحالة',
+
+        err_loading_contacts: 'فشل تحميل بيانات التواصل',
+        social_media_settings: 'الإعدادات العامة',
+        general_info: 'معلومات عامة',
+
+        // Phase 5 Keys
+        confirm_delete: 'هل أنت متأكد من حذف جهة الاتصال هذه؟',
+        edit_contact_desc: 'تحديث بيانات جهة الاتصال أدناه',
+        add_contact_desc: 'قم بتعبئة البيانات لإضافة جهة اتصال جديدة للفريق',
+        manage_team_contacts_desc: 'عرض وإدارة جميع أعضاء الفريق النشطين',
+
+
 
         // Notifications Management
         notif_mgmt_title: 'إدارة الإشعارات',
@@ -1339,6 +1379,45 @@ export const translations = {
         open_google_maps_btn: 'Open in Google Maps',
         close_map_btn: 'Close Map',
         select_this_location: 'Select This Location',
+        our_team: 'Our Team',
+        contact_team_desc: 'Get in touch with our team',
+        message_whatsapp: 'Message on WhatsApp',
+
+        // Contacts System
+        contacts_list: 'Contacts List',
+        manage_team_contacts: 'Manage Team Contacts',
+        add_edit_contact_desc: 'Add or edit team contact information',
+        no_contacts_found: 'No contacts found',
+        add_contact: 'Add Contact',
+        edit_contact: 'Edit Contact',
+        add_new_contact: 'Add New Contact',
+        contact_deleted: 'Contact deleted successfully',
+        error_deleting_contact: 'Failed to delete contact',
+        status_updated: 'Status updated successfully',
+        error_updating_status: 'Failed to update status',
+        are_you_sure: 'Are you sure?',
+        delete_contact_confirmation: 'Are you sure you want to delete this contact? This action cannot be undone.',
+        active: 'Active',
+        deactivate: 'Deactivate',
+        actions: 'Actions',
+
+        // Form & Table fields
+        name_label: 'Name',
+
+        note_label: 'Note',
+        status_label: 'Status',
+
+        err_loading_contacts: 'Failed to load contacts',
+        social_media_settings: 'General Settings',
+        general_info: 'General Info',
+
+        // Phase 5 Keys
+        confirm_delete: 'Are you sure you want to delete this contact?',
+        edit_contact_desc: 'Update contact details below.',
+        add_contact_desc: 'Fill in the details to add a new contact to the team.',
+        manage_team_contacts_desc: 'View and manage all active team members.',
+
+
     }
 };
 

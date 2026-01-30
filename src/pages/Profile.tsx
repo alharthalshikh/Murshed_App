@@ -185,7 +185,7 @@ export default function Profile() {
 
 
     return (
-        <div className="min-h-screen bg-background pb-20">
+        <div className="min-h-screen bg-background pb-24 md:pb-0">
             {/* Header */}
             <div className="relative h-64 bg-primary/10 rounded-b-[3rem] overflow-hidden">
                 <div className="absolute top-4 right-4 z-20">

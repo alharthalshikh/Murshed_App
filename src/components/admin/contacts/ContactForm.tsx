@@ -130,24 +130,24 @@ export function ContactForm({ onSuccess, editingContact, onCancelEdit }: Contact
                 const updates: UpdateContactDTO = values;
                 const updated = await updateContact(editingContact.id, updates);
                 if (updated) {
-                    toast.success('Contact updated successfully');
+                    toast.success(t('contact_updated_success'));
                     onSuccess(updated);
                     // Form clearing is handled by parent resetting editingContact or manual definition
                 } else {
-                    toast.error('Failed to update contact');
+                    toast.error(t('contact_update_error'));
                 }
             } else {
                 const newContact = await addContact(values as CreateContactDTO);
                 if (newContact) {
-                    toast.success('Contact added successfully');
+                    toast.success(t('contact_added_success'));
                     form.reset();
                     onSuccess(newContact);
                 } else {
-                    toast.error('Failed to add contact');
+                    toast.error(t('contact_add_error'));
                 }
             }
         } catch (error) {
-            toast.error('An error occurred');
+            toast.error(t('error_occurred'));
         } finally {
             setIsLoading(false);
         }

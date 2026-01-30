@@ -8,7 +8,7 @@ export async function getAllContacts(): Promise<Contact[]> {
     try {
         const result = await sql`
             SELECT * FROM contacts 
-            ORDER BY created_at DESC
+            ORDER BY created_at ASC
         `;
         return result as Contact[];
     } catch (error) {
@@ -23,7 +23,7 @@ export async function getActiveContacts(): Promise<Contact[]> {
         const result = await sql`
             SELECT * FROM contacts 
             WHERE is_active = true
-            ORDER BY created_at DESC
+            ORDER BY created_at ASC
         `;
         return result as Contact[];
     } catch (error) {

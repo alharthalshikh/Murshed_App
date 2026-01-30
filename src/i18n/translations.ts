@@ -440,8 +440,10 @@ export const translations = {
         edit_contact_desc: 'تحديث بيانات جهة الاتصال أدناه',
         add_contact_desc: 'قم بتعبئة البيانات لإضافة جهة اتصال جديدة للفريق',
         manage_team_contacts_desc: 'عرض وإدارة جميع أعضاء الفريق النشطين',
-
-
+        contact_added_success: 'تم إضافة جهة الاتصال بنجاح',
+        contact_updated_success: 'تم تحديث بيانات جهة الاتصال بنجاح',
+        contact_add_error: 'فشل في إضافة جهة الاتصال',
+        contact_update_error: 'فشل في تحديث جهة الاتصال',
 
         // Notifications Management
         notif_mgmt_title: 'إدارة الإشعارات',
@@ -1416,8 +1418,10 @@ export const translations = {
         edit_contact_desc: 'Update contact details below.',
         add_contact_desc: 'Fill in the details to add a new contact to the team.',
         manage_team_contacts_desc: 'View and manage all active team members.',
-
-
+        contact_added_success: 'Contact added successfully',
+        contact_updated_success: 'Contact updated successfully',
+        contact_add_error: 'Failed to add contact',
+        contact_update_error: 'Failed to update contact',
     }
 };
 

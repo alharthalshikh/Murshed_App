@@ -339,7 +339,30 @@ export async function updateReport(
     try {
         console.log(`🔄 تحديث البلاغ: ${reportId}`);
 
-        // التحقق من الملكية
+        // 1. التحقق من المستخدم الحالي (Requester)
+        // نعتمد على getCurrentUser للتأكد من الجلسة، لكننا نتحقق من الدور من قاعدة البيانات للأمان
+        const { getCurrentUser } = await import('./authService');
+        const sessionUser = getCurrentUser();
+
+        // إذا لم يكن هناك مستخدم مسجل دخول أو الـ ID غير متطابق (تلاعب محتمل)
+        if (!sessionUser || sessionUser.id !== userId) {
+            console.error('❌ محاولة تعديل غير مصرح بها: معرف المستخدم لا يطابق الجلسة');
+            return { success: false, error: 'جلسة غير صالحة أو منتهية' };
+        }
+
+        // 2. التحقق من صلاحيات المستخدم من قاعدة البيانات (Role Check)
+        const userCheck = await sql`
+            SELECT role FROM users WHERE id = ${userId}
+        `;
+
+        if (userCheck.length === 0) {
+            return { success: false, error: 'المستخدم غير موجود' };
+        }
+
+        const requesterRole = userCheck[0].role;
+        const isAdmin = requesterRole === 'admin';
+
+        // 3. التحقق من ملكية البلاغ
         const existingReports = await sql`
             SELECT user_id FROM reports WHERE id = ${reportId}
         `;
@@ -348,11 +371,16 @@ export async function updateReport(
             return { success: false, error: 'البلاغ غير موجود' };
         }
 
-        if (existingReports[0].user_id !== userId) {
-            return { success: false, error: 'ليس لديك صلاحية لتعديل هذا البلاغ' };
+        const reportOwnerId = existingReports[0].user_id;
+        const isOwner = reportOwnerId === userId;
+
+        // 4. تطبيق شرط الصلاحية (Admin OR Owner)
+        if (!isAdmin && !isOwner) {
+            console.warn(`⛔ رفض التعديل: المستخدم ${userId} ليس المالك وليس أدمن`);
+            return { success: false, error: 'ليس لديك صلاحية لتعديل هذا البلاغ (403)' };
         }
 
-        // تحديث بيانات البلاغ
+        // 5. تنفيذ التحديث
         await sql`
             UPDATE reports SET
                 type = COALESCE(${data.type}, type),

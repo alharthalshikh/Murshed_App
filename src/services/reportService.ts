@@ -1,6 +1,6 @@
 import { sql } from '@/lib/db';
 import { uploadMultipleImages } from './imageService';
-import { runAutoMatchForReport } from './matchingService';
+import { MatchingEngine } from './matchingEngine';
 import { generateImageDescriptionWithGemini } from './geminiService';
 
 export interface Report {
@@ -119,19 +119,19 @@ export async function createReport(data: CreateReportData, imageFiles?: File[]):
             console.log(`✅ تم رفع ${uploadedUrls.length} صور بنجاح`);
         }
 
-        // 🔍 تشغيل خوارزمية التطابق الذكي في الخلفية (غير محظور)
-        // يمكن التحكم فيها عبر متغير بيئة لتقليل الضغط في البيئات الحساسة للأداء
+        // 🔍 تشغيل خوارزمية التطابق الذكي والذكاء الاصطناعي في الخلفية
         const autoMatchEnabled = import.meta.env.VITE_AI_AUTO_MATCH_ON_CREATE !== 'false';
 
         if (autoMatchEnabled) {
-            console.log('🧠 تشغيل خوارزمية التطابق الذكي في الخلفية...');
-            runAutoMatchForReport(report.id).then(matchesFound => {
-                console.log(`✅ تم العثور على ${matchesFound} تطابق محتمل`);
-            }).catch(error => {
-                console.error('❌ خطأ في التطابق التلقائي:', error);
+            console.log('🧠 [V2] Triggering Matching Engine...');
+            // Robust Fire & Forget
+            MatchingEngine.run(report.id).catch(err => {
+                console.error("BG Matching Failed:", err);
             });
-        } else {
-            console.log('⏸ تم تعطيل التطابق التلقائي عند إنشاء البلاغ (VITE_AI_AUTO_MATCH_ON_CREATE=false)');
+            // Also process images, and when they are done, MatchingEngine will be called again (see processReportImagesWithAI)
+            processReportImagesWithAI(report.id).catch(error => {
+                console.error('❌ AI Processing Error:', error);
+            });
         }
 
         return { success: true, report, matchesFound: 0 }; // نرجع فوراً
@@ -410,9 +410,73 @@ export async function updateReport(
         }
 
         console.log('✅ تم تحديث البلاغ بنجاح');
+
+        // 4. Trigger Matching Engine
+        MatchingEngine.run(reportId);
+        processReportImagesWithAI(reportId).catch(err => console.error('Error in AI processing after update:', err));
+
         return { success: true };
     } catch (error) {
         console.error('❌ خطأ في تحديث البلاغ:', error);
         return { success: false, error: 'حدث خطأ أثناء تحديث البلاغ' };
+    }
+}
+
+/**
+ * معالجة صور البلاغ باستخدام الذكاء الاصطناعي (Gemini) وإعادة المطابقة
+ */
+export async function processReportImagesWithAI(reportId: string): Promise<void> {
+    try {
+        console.log(`🤖 البدء في تحليل بلاغ ${reportId} بالذكاء الاصطناعي...`);
+
+        // 1. جلب الصور التي ليس لها وصف
+        const imagesToProcess = await sql`
+            SELECT id, image_url FROM report_images 
+            WHERE report_id = ${reportId} 
+            AND (description_ai IS NULL OR description_ai = 'AI description failed')
+        `;
+
+        if (imagesToProcess.length === 0) {
+            console.log('⏩ لا توجد صور جديدة للتحليل أو تم تحليلها مسبقاً');
+            // مع ذلك، نشغل المطابقة للتأكد من تحديث النتائج بناءً على النص أو الموقع
+            await MatchingEngine.run(reportId);
+            return;
+        }
+
+        console.log(`📸 جاري تحليل ${imagesToProcess.length} صور باستخدام ذكاء Gemini...`);
+
+        // 2. تحليل كل صورة باستخدام Gemini وتحديث قاعدة البيانات
+        for (const img of imagesToProcess) {
+            try {
+                console.log(`📡 جاري إرسال الصورة للتحليل...`);
+                // جلب الملف من URL (Base64 أو رابط)
+                const response = await fetch(img.image_url);
+                const blob = await response.blob();
+
+                // توليد الوصف
+                const description = await generateImageDescriptionWithGemini(blob);
+
+                if (description && !description.includes('AI description failed')) {
+                    await sql`
+                        UPDATE report_images 
+                        SET description_ai = ${description} 
+                        WHERE id = ${img.id}
+                    `;
+                    console.log(`✅ تم تحديث وصف الصورة بنجاح: ${description.substring(0, 30)}...`);
+                } else {
+                    console.warn(`⚠️ فشل تحليل الصورة أو الوصف غير متاح: ${description}`);
+                }
+            } catch (imgError) {
+                console.error(`❌ فشل تحليل الصورة ${img.id}:`, imgError);
+            }
+        }
+
+        console.log('✅ اكتمل تحليل الصور بالذكاء الاصطناعي، جاري إعادة حساب التطابقات...');
+
+        // 3. Re-run V2 Matching Engine
+        await MatchingEngine.run(reportId);
+
+    } catch (error) {
+        console.error('❌ خطأ في معالجة الصور بالذكاء الاصطناعي:', error);
     }
 }

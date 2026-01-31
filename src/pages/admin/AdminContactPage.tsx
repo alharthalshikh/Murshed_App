@@ -245,6 +245,18 @@ export default function AdminContactPage() {
                                     </div>
 
                                     <div className="space-y-2">
+                                        <Label htmlFor="whatsapp_number">{t('contact_wa_label') || "WhatsApp Number"}</Label>
+                                        <Input
+                                            id="whatsapp_number"
+                                            value={socialData.whatsapp_number || ''}
+                                            onChange={e => setSocialData({ ...socialData, whatsapp_number: e.target.value })}
+                                            dir="ltr"
+                                            className={cn("bg-card", isRtl ? "text-right" : "text-left")}
+                                            placeholder="e.g. 967770000000"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
                                         <Label htmlFor="whatsapp_group">{t('whatsapp_group_label')}</Label>
                                         <Input
                                             id="whatsapp_group"

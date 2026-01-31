@@ -45,11 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initializeApp = async () => {
         try {
-            // تهيئة قاعدة البيانات (في الخلفية)
-            // تهيئة قاعدة البيانات (في الخلفية)
-            // initializeDatabase().catch(err =>
-            //     console.error('خطأ في تهيئة قاعدة البيانات:', err)
-            // );
+            // تهيئة قاعدة البيانات
+            await initializeDatabase().catch(err =>
+                console.error('خطأ في تهيئة قاعدة البيانات:', err)
+            );
 
             // التحقق من الجلسة الحالية
             const cachedUser = getCurrentUser();

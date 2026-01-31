@@ -6,6 +6,7 @@ export interface User {
     name: string;
     phone?: string;
     avatar_url?: string;
+    cover_url?: string;
     role: 'admin' | 'moderator' | 'user';
     is_active: boolean;
     is_suspended: boolean;
@@ -41,7 +42,7 @@ export async function login(credentials: LoginCredentials): Promise<AuthResult> 
         console.log('🔄 Login attempt...');
 
         const users = await sql`
-      SELECT id, email, name, phone, avatar_url, role, is_active, is_suspended, created_at
+      SELECT id, email, name, phone, avatar_url, cover_url, role, is_active, is_suspended, created_at
       FROM users
       WHERE email = ${credentials.email} AND password_hash = ${credentials.password}
     `;
@@ -114,7 +115,7 @@ export async function register(data: RegisterData): Promise<AuthResult> {
         const newUsers = await sql`
       INSERT INTO users (email, password_hash, name, phone)
       VALUES (${data.email}, ${data.password}, ${data.name}, ${data.phone || null})
-      RETURNING id, email, name, phone, avatar_url, role, is_active, is_suspended, created_at
+      RETURNING id, email, name, phone, avatar_url, cover_url, role, is_active, is_suspended, created_at
     `;
 
         const user = newUsers[0] as User;
@@ -154,7 +155,7 @@ export async function updateUserAvatar(userId: string, avatarUrl: string): Promi
       UPDATE users 
       SET avatar_url = ${avatarUrl}
       WHERE id = ${userId}
-      RETURNING id, email, name, phone, avatar_url, role, is_active, is_suspended, created_at
+      RETURNING id, email, name, phone, avatar_url, cover_url, role, is_active, is_suspended, created_at
     `;
 
         if (users.length === 0) return null;
@@ -171,6 +172,100 @@ export async function updateUserAvatar(userId: string, avatarUrl: string): Promi
     } catch (error) {
         console.error('Error updating avatar:', error);
         return null;
+    }
+}
+
+/**
+ * تحديث صورة الغلاف للمستخدم
+ */
+export async function updateUserCover(userId: string, coverUrl: string): Promise<User | null> {
+    try {
+        const users = await sql`
+      UPDATE users 
+      SET cover_url = ${coverUrl}
+      WHERE id = ${userId}
+      RETURNING id, email, name, phone, avatar_url, cover_url, role, is_active, is_suspended, created_at
+    `;
+
+        if (users.length === 0) return null;
+
+        const user = users[0] as User;
+
+        // تحديث الجلسة الحالية
+        const session = getSession();
+        if (session && session.user.id === userId) {
+            saveSession(session.token, user);
+        }
+
+        return user;
+    } catch (error) {
+        console.error('Error updating cover:', error);
+        return null;
+    }
+}
+
+/**
+ * تحديث بيانات المستخدم (الاسم ورقم الهاتف)
+ */
+export async function updateUserProfile(userId: string, data: { name: string; phone?: string }): Promise<User | null> {
+    try {
+        const users = await sql`
+        UPDATE users 
+        SET name = ${data.name}, phone = ${data.phone || null}
+        WHERE id = ${userId}
+        RETURNING id, email, name, phone, avatar_url, cover_url, role, is_active, is_suspended, created_at
+        `;
+
+        if (users.length === 0) return null;
+
+        const user = users[0] as User;
+
+        // تحديث الجلسة الحالية
+        const session = getSession();
+        if (session && session.user.id === userId) {
+            // نحتفظ بالتوكن ونحدث بيانات المستخدم
+            saveSession(session.token, user);
+        }
+
+        return user;
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        return null;
+    }
+}
+
+/**
+ * تغيير كلمة المرور
+ */
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        // 1. التحقق من كلمة المرور الحالية
+        const users = await sql`
+        SELECT id FROM users 
+        WHERE id = ${userId} AND password_hash = ${currentPassword}
+        `;
+
+        if (users.length === 0) {
+            return {
+                success: false,
+                error: 'err_current_password_incorrect'
+            };
+        }
+
+        // 2. تحديث كلمة المرور
+        await sql`
+        UPDATE users 
+        SET password_hash = ${newPassword}
+        WHERE id = ${userId}
+        `;
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error changing password:', error);
+        return {
+            success: false,
+            error: 'err_unexpected'
+        };
     }
 }
 
@@ -203,7 +298,7 @@ export async function validateSession(): Promise<AuthResult> {
         }
 
         const sessions = await sql`
-      SELECT u.id, u.email, u.name, u.phone, u.avatar_url, u.role, u.is_active, u.is_suspended, u.created_at
+      SELECT u.id, u.email, u.name, u.phone, u.avatar_url, u.cover_url, u.role, u.is_active, u.is_suspended, u.created_at
       FROM user_sessions s
       JOIN users u ON s.user_id = u.id
       WHERE s.token = ${session.token} AND s.expires_at > NOW()

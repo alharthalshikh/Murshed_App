@@ -6,6 +6,7 @@ export interface User {
     name: string;
     phone?: string;
     avatar_url?: string;
+    cover_url?: string;
     role: 'admin' | 'moderator' | 'user';
     is_active: boolean;
     is_suspended: boolean;

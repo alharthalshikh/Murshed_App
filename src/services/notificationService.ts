@@ -47,10 +47,24 @@ export async function createNotification(data: {
  */
 export async function notifyAdminsOfMatch(matchId: string, lostReportTitle: string, foundReportTitle: string, score: number): Promise<void> {
     try {
-        // جلب جميع المديرين
+        // التحقق من عدم وجود إشعار لنفس التطابق في آخر 24 ساعة (منع الإزعاج)
+        const recentNotification = await sql`
+            SELECT id FROM notifications 
+            WHERE related_match_id = ${matchId} 
+            AND title = 'notif_match_potential_title'
+            AND created_at > NOW() - INTERVAL '24 hours'
+            LIMIT 1
+        `;
+
+        if (recentNotification.length > 0) {
+            console.log('⏩ تخطي الإشعار: تم إرسال إشعار لهذا التطابق مؤخراً');
+            return;
+        }
+
+        // جلب جميع المديرين والمشرفين
         const admins = await sql`
-      SELECT id FROM users WHERE role = 'admin' OR role = 'moderator'
-    `;
+            SELECT id FROM users WHERE role = 'admin' OR role = 'moderator'
+        `;
 
         const scorePercent = Math.round(score * 100);
 
@@ -67,7 +81,7 @@ export async function notifyAdminsOfMatch(matchId: string, lostReportTitle: stri
             });
         }
 
-        console.log(`✅ Sent notification to ${admins.length} admins`);
+        console.log(`✅ Sent notification to ${admins.length} admins/moderators`);
     } catch (error) {
         console.error('❌ Error sending admin notifications:', error);
     }

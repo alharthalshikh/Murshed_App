@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Search, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, User, Phone, CheckCircle2 } from 'lucide-react';
 import { useLanguage, type TranslationKey } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
+import { GoogleBackground } from '@/components/ui/GoogleBackground';
 
 export default function Register() {
     const [formData, setFormData] = useState({
@@ -112,11 +113,8 @@ export default function Register() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 py-10">
-            {/* Background Pattern */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl" />
-                <div className="absolute bottom-20 left-20 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
-            </div>
+            {/* Animated Background Particles */}
+            <GoogleBackground count={600} className="opacity-40" />
 
             <div className="w-full max-w-md relative z-10">
                 {/* Logo */}

@@ -4,7 +4,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card, CardContent, CardHeader,
+    CardTitle,
+    CardDescription
+} from '@/components/ui/card';
 import {
     Camera,
     MapPin,
@@ -21,7 +25,13 @@ import {
     Monitor,
     Clock,
     Languages,
-    Globe
+    Globe,
+    Edit2,
+    Save,
+    X,
+    Lock,
+    Key,
+    Phone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
@@ -35,8 +45,11 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogFooter,
+    DialogDescription,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { updateUserProfile, changePassword, updateUserCover } from '@/services/authService';
 
 // ... (previous imports)
 
@@ -46,11 +59,77 @@ export default function Profile() {
     const { language, setLanguage, resolvedLanguage, t } = useLanguage();
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const coverInputRef = useRef<HTMLInputElement>(null);
 
     const [isUploading, setIsUploading] = useState(false);
     const [cropperOpen, setCropperOpen] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+    // Profile Editing State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState({ name: '', phone: '' });
+
+    // Password Change State
+    const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+    const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
+
+    const handleEditToggle = () => {
+        if (!isEditing && user) {
+            setEditData({ name: user.name, phone: user.phone || '' });
+        }
+        setIsEditing(!isEditing);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!user) return;
+
+        setIsUploading(true);
+        try {
+            const updatedUser = await updateUserProfile(user.id, editData);
+            if (updatedUser) {
+                await refreshUser();
+                toast.success(t('profile_updated_success'));
+                setIsEditing(false);
+            } else {
+                toast.error(t('profile_update_failed'));
+            }
+        } catch (error) {
+            toast.error(t('err_unexpected'));
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        if (!user) return;
+
+        if (passwordData.new !== passwordData.confirm) {
+            toast.error(t('err_password_mismatch'));
+            return;
+        }
+
+        if (passwordData.new.length < 6) {
+            toast.error(t('err_password_short'));
+            return;
+        }
+
+        setIsUploading(true);
+        try {
+            const result = await changePassword(user.id, passwordData.current, passwordData.new);
+            if (result.success) {
+                toast.success(t('password_changed_success'));
+                setIsPasswordDialogOpen(false);
+                setPasswordData({ current: '', new: '', confirm: '' });
+            } else {
+                toast.error(t(result.error as any || 'err_unexpected'));
+            }
+        } catch (error) {
+            toast.error(t('err_unexpected'));
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -94,6 +173,28 @@ export default function Profile() {
         } finally {
             setIsUploading(false);
             setSelectedImage(null);
+        }
+    };
+
+    const handleCoverChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !user) return;
+
+        setIsUploading(true);
+        try {
+            const uploadResult = await uploadImage(file);
+            if (!uploadResult.success || !uploadResult.url) {
+                throw new Error(uploadResult.error || t('err_image_upload'));
+            }
+
+            await updateUserCover(user.id, uploadResult.url);
+            await refreshUser();
+            toast.success(t('success_cover_updated'));
+        } catch (error) {
+            console.error(error);
+            toast.error(t('err_unexpected'));
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -186,79 +287,73 @@ export default function Profile() {
 
     return (
         <div className="min-h-screen bg-background pb-24 md:pb-0">
-            {/* Header */}
-            <div className="relative h-64 bg-primary/10 rounded-b-[3rem] overflow-hidden">
+            {/* Header with Background Image */}
+            <div className="relative h-80 w-full overflow-hidden group/header">
+                {/* Background Image */}
+                <div className="absolute inset-0 z-0">
+                    <img
+                        src={user.cover_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1200"}
+                        alt="Header Background"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover/header:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+                </div>
+
+                {/* Back Button */}
                 <div className="absolute top-4 right-4 z-20">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => navigate(-1)}
-                        className="bg-background/20 hover:bg-background/40 text-foreground backdrop-blur-sm rounded-full"
+                        className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-md rounded-full border border-white/20"
                     >
                         {resolvedLanguage === 'ar' ? <ArrowRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
                     </Button>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-b from-primary/25 to-transparent shadow-inner" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center pt-8">
-                    {/* NEW DESIGN v2.0 - 2026-01-09 */}
-                    <div className="relative inline-block mb-3 group" key="avatar-container-v2">
-                        {/* الصورة الرئيسية - حجم كبير 160px */}
+
+                {/* Main Edit Button (Pencil Icon floating like in screenshot) */}
+                <div className="absolute top-4 left-4 z-20">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleEditToggle}
+                        className="h-12 w-12 bg-white/10 hover:bg-white/30 text-white backdrop-blur-md rounded-full border border-white/30 shadow-xl transition-all hover:rotate-12"
+                        title={t('edit')}
+                    >
+                        <Edit2 className="w-6 h-6" />
+                    </Button>
+                </div>
+
+                {/* Profile Content Over Background */}
+                <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 z-10">
+                    <div className="relative inline-block mb-4 group/avatar" key="avatar-v2">
                         <div
-                            className="w-40 h-40 rounded-full border-[6px] border-background shadow-2xl overflow-hidden bg-background relative cursor-pointer transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.4)]"
+                            className="w-36 h-36 rounded-full border-[6px] border-background shadow-2xl overflow-hidden bg-background relative cursor-pointer transition-all duration-300 group-hover/avatar:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
                             onClick={() => setIsPreviewOpen(true)}
                         >
-                            {isUploading ? (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                                    <div className="text-center">
-                                        <Loader2 className="w-12 h-12 text-white animate-spin mx-auto mb-2" />
-                                        <p className="text-white text-xs font-medium">{t('uploading_badge')}</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <img
-                                        src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}&background=random&size=512`}
-                                        alt={user.name}
-                                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                                        onError={(e) => {
-                                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.name}&background=random&size=512`;
-                                        }}
-                                    />
-                                    {/* Overlay عند الـ hover */}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">
-                                        <Camera className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    </div>
-                                </>
-                            )}
+                            <img
+                                src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}&background=random&size=512`}
+                                alt={user.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover/avatar:scale-110"
+                                onError={(e) => {
+                                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.name}&background=random&size=512`;
+                                }}
+                            />
                         </div>
-
-                        {/* أيقونة التعديل في الزاوية */}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                fileInputRef.current?.click();
-                            }}
-                            disabled={isUploading}
-                            className={cn("absolute bottom-2 w-14 h-14 bg-gray-800 hover:bg-gray-700 text-white rounded-full shadow-2xl transition-all duration-300 hover:scale-110 z-10 border-4 border-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed", resolvedLanguage === 'ar' ? "right-2" : "left-2")}
-                            title={t('change_avatar_title')}
-                        >
-                            <Camera className="w-6 h-6" />
-                        </button>
-
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept="image/*"
-                            onChange={handleFileChange}
-                            disabled={isUploading}
-                        />
                     </div>
-                    <h1 className="text-2xl font-bold text-foreground">{user.name}</h1>
-                    <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5 justify-center">
-                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        {t('profile_welcome')}
-                    </p>
+
+                    <div className="text-center px-4">
+                        <h1 className="text-3xl font-extrabold text-white mb-2 drop-shadow-lg tracking-tight">
+                            {t('greeting_with_name').replace('{name}', user.name)}
+                        </h1>
+                        {user.phone && (
+                            <p className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-white/90 text-sm border border-white/10 shadow-sm" dir="ltr">
+                                <Phone className="w-3.5 h-3.5 opacity-70" />
+                                {user.phone}
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -443,6 +538,21 @@ export default function Profile() {
                     </Card>
 
                     <Card
+                        className="border-0 shadow-sm bg-card/50 hover:bg-card transition-colors cursor-pointer"
+                        onClick={() => setIsPasswordDialogOpen(true)}
+                    >
+                        <CardContent className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center text-purple-600">
+                                    <Lock className="w-5 h-5" />
+                                </div>
+                                <span className="font-medium">{t('change_password')}</span>
+                            </div>
+                            <ChevronLeft className={cn("w-5 h-5 text-muted-foreground", resolvedLanguage === 'en' && "rotate-180")} />
+                        </CardContent>
+                    </Card>
+
+                    <Card
                         className="border-0 shadow-sm bg-card/50 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer group"
                         onClick={handleLogout}
                     >
@@ -456,7 +566,7 @@ export default function Profile() {
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </div >
 
             <ImageCropper
                 open={cropperOpen}
@@ -478,6 +588,232 @@ export default function Profile() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Edit Profile Dialog */}
+            <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t('edit_profile')}</DialogTitle>
+                        <DialogDescription>
+                            {t('user_edit_desc')}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6 py-4">
+                        {/* Avatar & Cover Edit in Dialog */}
+                        <div className="flex flex-col items-center gap-6">
+                            <div className="flex flex-col items-center gap-2">
+                                <Label className="text-xs text-muted-foreground uppercase tracking-widest">{t('change_avatar_title')}</Label>
+                                <div className="relative group/dialog-avatar">
+                                    <div className="w-24 h-24 rounded-full border-4 border-muted overflow-hidden bg-muted">
+                                        <img
+                                            src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}&background=random&size=512`}
+                                            alt={user.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <Button
+                                        size="icon"
+                                        variant="secondary"
+                                        className="absolute bottom-0 right-0 h-8 w-8 rounded-full shadow-lg border-2 border-background"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isUploading}
+                                    >
+                                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col items-center gap-2 w-full">
+                                <Label className="text-xs text-muted-foreground uppercase tracking-widest">{t('change_cover_title')}</Label>
+                                <div
+                                    className="w-full h-24 rounded-xl border-2 border-dashed border-muted-foreground/20 overflow-hidden bg-muted relative cursor-pointer group/dialog-cover"
+                                    onClick={() => coverInputRef.current?.click()}
+                                >
+                                    <img
+                                        src={user.cover_url || "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1200"}
+                                        alt="Cover Background"
+                                        className="w-full h-full object-cover opacity-60 group-hover/dialog-cover:opacity-80 transition-opacity"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="bg-background/80 backdrop-blur-sm p-2 rounded-full shadow-sm text-primary group-hover/dialog-cover:scale-110 transition-transform">
+                                            {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                disabled={isUploading}
+                            />
+                            <input
+                                type="file"
+                                ref={coverInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleCoverChange}
+                                disabled={isUploading}
+                            />
+                        </div>
+
+                        {/* Name Input */}
+                        <div className="space-y-2">
+                            <Label htmlFor="popup-name" className="text-sm font-medium">{t('full_name')}</Label>
+                            <div className="relative">
+                                <UserIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="popup-name"
+                                    value={editData.name}
+                                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                                    className="pl-9 h-11"
+                                    placeholder={t('full_name_placeholder')}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone Input */}
+                        <div className="space-y-2">
+                            <Label htmlFor="popup-phone" className="text-sm font-medium">{t('phone_number')}</Label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="popup-phone"
+                                    value={editData.phone}
+                                    onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                                    className="pl-9 h-11"
+                                    placeholder={t('phone_placeholder')}
+                                    dir="ltr"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isUploading} className="flex-1 sm:flex-none">
+                            {t('cancel')}
+                        </Button>
+                        <Button onClick={handleSaveProfile} disabled={isUploading || !editData.name} className="flex-1 sm:flex-none bg-primary hover:bg-primary/90">
+                            {isUploading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    {t('saving_btn')}
+                                </>
+                            ) : (
+                                t('save_changes')
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Change Password Dialog */}
+            <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t('change_password')}</DialogTitle>
+                        <DialogDescription>
+                            {t('user_edit_desc')}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="current-password">{t('current_password')}</Label>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="current-password"
+                                    type="password"
+                                    className="pl-9"
+                                    value={passwordData.current}
+                                    onChange={(e) => setPasswordData({ ...passwordData, current: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-password">{t('new_password')}</Label>
+                            <div className="relative">
+                                <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="new-password"
+                                    type="password"
+                                    className="pl-9"
+                                    value={passwordData.new}
+                                    onChange={(e) => setPasswordData({ ...passwordData, new: e.target.value })}
+                                />
+                            </div>
+                            <PasswordStrengthBar password={passwordData.new} t={t} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirm-password">{t('confirm_password')}</Label>
+                            <div className="relative">
+                                <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="confirm-password"
+                                    type="password"
+                                    className="pl-9"
+                                    value={passwordData.confirm}
+                                    onChange={(e) => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)} disabled={isUploading}>
+                            {t('cancel')}
+                        </Button>
+                        <Button onClick={handleChangePassword} disabled={isUploading || !passwordData.current || !passwordData.new}>
+                            {isUploading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    {t('saving_btn')}
+                                </>
+                            ) : (
+                                t('save_changes')
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div >
+    );
+}
+
+function PasswordStrengthBar({ password, t }: { password: string, t: any }) {
+    if (!password) return null;
+
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+
+    let level = 0;
+    let text = '';
+    let color = '';
+
+    if (score <= 2) { level = 1; text = t('weak'); color = 'bg-destructive'; }
+    else if (score <= 3) { level = 2; text = t('medium'); color = 'bg-warning'; }
+    else { level = 3; text = t('strong'); color = 'bg-success'; }
+
+    return (
+        <div className="space-y-1 mt-2">
+            <div className="flex gap-1">
+                {[1, 2, 3].map((l) => (
+                    <div
+                        key={l}
+                        className={`h-1 flex-1 rounded-full transition-colors ${l <= level ? color : 'bg-muted'}`}
+                    />
+                ))}
+            </div>
+            <p className="text-xs text-muted-foreground text-right">
+                {t('password_strength')} <span className="font-medium">{text}</span>
+            </p>
         </div>
     );
 }

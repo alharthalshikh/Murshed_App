@@ -37,6 +37,7 @@ const AdminMatches = lazy(() => import("./pages/admin/AdminMatches"));
 const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminContactPage = lazy(() => import("./pages/admin/AdminContactPage"));
+const MatchDebugger = lazy(() => import("./pages/admin/MatchDebugger"));
 
 // Moderator Pages
 const ModeratorDashboard = lazy(() => import("./pages/moderator/ModeratorDashboard"));
@@ -122,6 +123,7 @@ const App = () => (
                     <Route path="notifications" element={<AdminNotifications />} />
                     <Route path="settings" element={<AdminSettings />} />
                     <Route path="contact" element={<AdminContactPage />} />
+                    <Route path="debug" element={<MatchDebugger />} />
                     <Route path="achievements" element={<Achievements />} />
                   </Route>
 

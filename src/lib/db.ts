@@ -20,6 +20,7 @@ export async function initializeDatabase() {
         name TEXT NOT NULL,
         phone TEXT,
         avatar_url TEXT,
+        cover_url TEXT,
         role TEXT NOT NULL DEFAULT 'user',
         is_active BOOLEAN DEFAULT true,
         is_suspended BOOLEAN DEFAULT false,
@@ -27,9 +28,10 @@ export async function initializeDatabase() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
       )
     `;
-    // التأكد من وجود عمود التعطيل (is_suspended) للجداول المنشأة مسبقاً
+    // التأكد من وجود عمود التعطيل (is_suspended) وعمود صورة الغلاف (cover_url) للجداول المنشأة مسبقاً
     try {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_url TEXT`;
     } catch (e) { }
     console.log('✅ جدول users تم إنشاؤه/تحديثه');
 
@@ -98,6 +100,7 @@ export async function initializeDatabase() {
         image_score DOUBLE PRECISION NOT NULL DEFAULT 0,
         text_score DOUBLE PRECISION NOT NULL DEFAULT 0,
         location_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+        time_score DOUBLE PRECISION NOT NULL DEFAULT 0,
         final_score DOUBLE PRECISION NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'pending',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
@@ -105,6 +108,9 @@ export async function initializeDatabase() {
       )
     `;
     console.log('✅ جدول ai_matches تم إنشاؤه');
+    try {
+      await sql`ALTER TABLE ai_matches ADD COLUMN IF NOT EXISTS time_score DOUBLE PRECISION NOT NULL DEFAULT 0`;
+    } catch (e) { }
 
     // إنشاء جدول الإشعارات
     await sql`

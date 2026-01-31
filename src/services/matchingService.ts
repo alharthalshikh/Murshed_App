@@ -37,6 +37,7 @@ export interface AIMatch {
     image_score: number;
     text_score: number;
     location_score: number;
+    time_score: number;
     final_score: number;
     status: 'pending' | 'confirmed' | 'rejected';
     created_at: string;
@@ -49,14 +50,14 @@ export interface AIMatch {
 // ==================== Matching Algorithm Settings ====================
 
 const MATCH_SETTINGS = {
-    // أوزان الخوارزمية (المُحدثة للاعتماد على وصف AI)
-    TEXT_WEIGHT: 0.25,      // وزن تشابه النص والوصف والعلامات المميزة
+    // أوزان الخوارزمية (المتوسط المرجح)
+    TEXT_WEIGHT: 0.20,      // وزن تشابه النص والوصف والعلامات المميزة
     LOCATION_WEIGHT: 0.20,  // وزن تشابه الموقع (GPS + المدينة)
     TIME_WEIGHT: 0.10,      // وزن قرب التاريخ
-    IMAGE_WEIGHT: 0.45,     // وزن تشابه وصف الصور (AI Description)
+    IMAGE_WEIGHT: 0.50,     // وزن تشابه وصف الصور (AI Description)
 
-    // العتبات (تم تعديلها لتتوافق مع طلب المستخدم 60%)
-    MIN_THRESHOLD: 0.60,    // الحد الأدنى للتطابق
+    // العتبات
+    MIN_THRESHOLD: 0.60,    // الحد الأدنى للتطابق (تم الرفع بناءً على طلب المستخدم)
     HIGH_THRESHOLD: 0.85,   // تطابق عالي
 
     // إعدادات
@@ -184,6 +185,7 @@ async function findMatchesWithPythonService(report: Report): Promise<AIMatch[]> 
                 image_score: pyMatch.breakdown.visual_similarity,
                 text_score: pyMatch.breakdown.text_similarity,
                 location_score: pyMatch.breakdown.location_score,
+                time_score: pyMatch.breakdown.time_score || 0,
                 final_score: pyMatch.final_score,
                 status: 'pending',
                 created_at: new Date().toISOString(),
@@ -271,7 +273,8 @@ async function findMatchesLocally(report: Report): Promise<AIMatch[]> {
         const competitorType = report.type === 'lost' ? 'found' : 'lost';
         const candidates = await sql`
             SELECT r.*, 
-                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images
+                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images,
+                ARRAY(SELECT description_ai FROM report_images WHERE report_id = r.id AND description_ai IS NOT NULL) as image_descriptions
             FROM reports r
             WHERE r.type = ${competitorType}
             AND r.status IN ('pending', 'processing')
@@ -302,14 +305,24 @@ async function findMatchesLocally(report: Report): Promise<AIMatch[]> {
                 }
             );
 
-            // 2. تشابه الصور (45%)
+            // 2. تشابه الصور (50%) - الأولوية لوصف الذكاء الاصطناعي
             let imageScore = 0;
-            const reportImages = report.images || [];
-            const candidateImages = candidate.images || [];
+            const rDesc = (report.image_descriptions || []).join(' ');
+            const cDesc = (candidate.image_descriptions || []).join(' ');
 
-            if (reportImages.length > 0 && candidateImages.length > 0) {
-                // استخدام التحليل البصري المحلي (pHash + Histogram)
-                imageScore = await compareImageSets(reportImages, candidateImages);
+            if (rDesc && cDesc) {
+                // استخدام تشابه النص على الأوصاف المولدة بالذكاء الاصطناعي
+                const descSimilarity = calculateTextSimilarity(rDesc, cDesc);
+                imageScore = descSimilarity.overall;
+                console.log(`🤖 AI-Image Match (${candidate.title}):`, imageScore);
+            } else {
+                // Fallback to visual similarity if descriptions are missing
+                const reportImages = report.images || [];
+                const candidateImages = candidate.images || [];
+                if (reportImages.length > 0 && candidateImages.length > 0) {
+                    imageScore = await compareImageSets(reportImages, candidateImages);
+                    console.log(`📸 Visual-Image Match (${candidate.title}):`, imageScore);
+                }
             }
 
             // 3. تشابه الموقع (20%)
@@ -318,9 +331,22 @@ async function findMatchesLocally(report: Report): Promise<AIMatch[]> {
             // 4. تشابه الوقت (10%)
             const timeScore = calculateTimeScore(report, candidate as Report);
 
-            // 3. حساب النتيجة النهائية (المتوسط الحسابي)
-            const validScores = [textScore, imageScore, locationScore, timeScore];
-            const finalScore = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+            // 3. حساب النتيجة النهائية (المتوسط المرجح)
+            const finalScore = (
+                (imageScore * MATCH_SETTINGS.IMAGE_WEIGHT) +
+                (textScore * MATCH_SETTINGS.TEXT_WEIGHT) +
+                (locationScore * MATCH_SETTINGS.LOCATION_WEIGHT) +
+                (timeScore * MATCH_SETTINGS.TIME_WEIGHT)
+            );
+
+            console.log(`🧐 Match Check: ${candidate.title}`, {
+                image: imageScore,
+                text: textScore,
+                location: locationScore,
+                time: timeScore,
+                final: finalScore,
+                threshold: MATCH_SETTINGS.MIN_THRESHOLD
+            });
 
             if (finalScore >= MATCH_SETTINGS.MIN_THRESHOLD) {
                 matches.push({
@@ -330,6 +356,7 @@ async function findMatchesLocally(report: Report): Promise<AIMatch[]> {
                     image_score: Math.min(100, Math.round(imageScore * 100)) / 100,
                     text_score: Math.min(100, Math.round(textScore * 100)) / 100,
                     location_score: Math.min(100, Math.round(locationScore * 100)) / 100,
+                    time_score: Math.min(100, Math.round(timeScore * 100)) / 100,
                     final_score: Math.min(100, Math.round(finalScore * 100)) / 100,
                     status: 'pending',
                     created_at: new Date().toISOString(),
@@ -354,7 +381,8 @@ export async function findPotentialMatches(reportId: string): Promise<AIMatch[]>
 
         const reports = await sql`
             SELECT r.*, 
-                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images
+                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images,
+                ARRAY(SELECT description_ai FROM report_images WHERE report_id = r.id AND description_ai IS NOT NULL) as image_descriptions
             FROM reports r 
             WHERE r.id = ${reportId}
         `;
@@ -362,16 +390,45 @@ export async function findPotentialMatches(reportId: string): Promise<AIMatch[]>
         if (reports.length === 0) return [];
         const report = reports[0] as Report;
 
-        // 1. محاولة استخدام خدمة Python أولاً (للدقة العالية)
+        let allMatches: AIMatch[] = [];
+
+        // 1. محاولة استخدام خدمة Python أولاً (للدقة العالية في الـ Embeddings)
         try {
             const pyMatches = await findMatchesWithPythonService(report);
-            if (pyMatches.length > 0) return pyMatches;
+            if (pyMatches.length > 0) {
+                allMatches = [...pyMatches];
+                console.log(`🐍 خدمة Python وجدت ${pyMatches.length} تطابق`);
+            }
         } catch (e) {
-            console.warn('⚠️ خدمة Python غير متاحة، جاري استخدام البطابقة المحلية...');
+            console.warn('⚠️ خدمة Python غير متاحة، جاري الاعتماد على المطابقة المحلية...');
         }
 
-        // 2. استخدام المنطق المحلي كبديل (أو إذا لم تجد خدمة Python نتائج)
-        return await findMatchesLocally(report);
+        // 2. استخدام المنطق المحلي (دائماً) لضمان الدقة بناءً على أوصاف Gemini والعلامات المميزة
+        const localMatches = await findMatchesLocally(report);
+        console.log(`🏠 المطابقة المحلية وجدت ${localMatches.length} تطابق`);
+
+        // دمج النتائج مع إزالة التكرار (الأولوية للـ ID)
+        const mergedMatches = [...allMatches];
+        const existingIdSet = new Set(mergedMatches.map(m =>
+            report.type === 'lost' ? m.found_report_id : m.lost_report_id
+        ));
+
+        for (const lMatch of localMatches) {
+            const competitorId = report.type === 'lost' ? lMatch.found_report_id : lMatch.lost_report_id;
+            if (!existingIdSet.has(competitorId)) {
+                mergedMatches.push(lMatch);
+            } else {
+                // إذا كان موجوداً، نحدث النتيجة لو كانت المحلية أعلى
+                const idx = mergedMatches.findIndex(m =>
+                    (report.type === 'lost' ? m.found_report_id : m.lost_report_id) === competitorId
+                );
+                if (idx !== -1 && lMatch.final_score > mergedMatches[idx].final_score) {
+                    mergedMatches[idx] = lMatch;
+                }
+            }
+        }
+
+        return mergedMatches;
 
     } catch (error) {
         console.error('❌ خطأ في البحث عن التطابقات:', error);
@@ -400,31 +457,35 @@ export async function saveMatch(match: Omit<AIMatch, 'id' | 'created_at' | 'upda
         const result = await sql`
       INSERT INTO ai_matches (
         lost_report_id, found_report_id, 
-        image_score, text_score, location_score, final_score, status
+        image_score, text_score, location_score, time_score, final_score, status
       )
       VALUES (
         ${match.lost_report_id}, ${match.found_report_id},
         ${match.image_score}, ${match.text_score}, 
-        ${match.location_score}, ${match.final_score}, ${match.status}
+        ${match.location_score}, ${match.time_score}, ${match.final_score}, ${match.status}
       )
       RETURNING *
     `;
 
         const savedMatch = result[0] as AIMatch;
 
-        // جلب معلومات البلاغات لإرسال الإشعار
-        const lostReport = await sql`SELECT title FROM reports WHERE id = ${match.lost_report_id}`;
-        const foundReport = await sql`SELECT title FROM reports WHERE id = ${match.found_report_id}`;
+        // التحقق من نسبة التطابق لإرسال إشعار "تطابق محتمل" (60% أو أكثر)
+        if (match.final_score >= MATCH_SETTINGS.MIN_THRESHOLD) {
+            // جلب معلومات البلاغات لإرسال الإشعار
+            const lostReport = await sql`SELECT title FROM reports WHERE id = ${match.lost_report_id}`;
+            const foundReport = await sql`SELECT title FROM reports WHERE id = ${match.found_report_id}`;
 
-        // إرسال إشعار للمديرين
-        await notifyAdminsOfMatch(
-            savedMatch.id,
-            lostReport[0]?.title || 'بلاغ مفقود',
-            foundReport[0]?.title || 'بلاغ موجود',
-            match.final_score
-        );
+            // إرسال إشعار للمديرين (Admin & Moderator/Supervisor)
+            await notifyAdminsOfMatch(
+                savedMatch.id,
+                lostReport[0]?.title || 'بلاغ مفقود',
+                foundReport[0]?.title || 'بلاغ موجود',
+                match.final_score
+            );
+            console.log('✅ تم العثور على تطابق محتمل (>= 60%) وإرسال إشعار للمديرين');
+        }
 
-        console.log('✅ تم حفظ التطابق وإرسال إشعار للمديرين');
+        console.log('✅ تم حفظ التطابق في قاعدة البيانات');
         return savedMatch;
     } catch (error) {
         console.error('❌ خطأ في حفظ التطابق:', error);
@@ -456,18 +517,20 @@ export async function getMatchesWithDetails(status?: string): Promise<AIMatch[]>
       `;
         } else {
             matches = await sql`
-        SELECT m.*,
-          lr.title as lost_title, lr.description as lost_description,
-          lr.category as lost_category, lr.location_city as lost_city,
-          lr.user_id as lost_user_id,
-          fr.title as found_title, fr.description as found_description,
-          fr.category as found_category, fr.location_city as found_city,
-          fr.user_id as found_user_id
-        FROM ai_matches m
-        LEFT JOIN reports lr ON m.lost_report_id = lr.id
-        LEFT JOIN reports fr ON m.found_report_id = fr.id
-        ORDER BY m.final_score DESC, m.created_at DESC
-      `;
+            SELECT
+                m.*,
+                lr.title as lost_title, lr.description as lost_description,
+                lr.category as lost_category, lr.location_city as lost_city,
+                lr.user_id as lost_user_id,
+                fr.title as found_title, fr.description as found_description,
+                fr.category as found_category, fr.location_city as found_city,
+                fr.user_id as found_user_id
+            FROM ai_matches m
+            LEFT JOIN reports lr ON m.lost_report_id = lr.id
+            LEFT JOIN reports fr ON m.found_report_id = fr.id
+            WHERE m.final_score >= ${MATCH_SETTINGS.MIN_THRESHOLD}
+            ORDER BY m.final_score DESC, m.created_at DESC
+        `;
         }
 
         // جلب صور كل بلاغ
@@ -649,7 +712,7 @@ export async function reMatchReport(reportId: string): Promise<number> {
         for (const match of matches) {
             // تحقق هل التطابق موجود
             const existing = await sql`
-                SELECT id, status FROM ai_matches 
+                SELECT id, status, final_score FROM ai_matches 
                 WHERE lost_report_id = ${match.lost_report_id} 
                 AND found_report_id = ${match.found_report_id}
             `;
@@ -666,16 +729,36 @@ export async function reMatchReport(reportId: string): Promise<number> {
                         image_score = ${match.image_score},
                         text_score = ${match.text_score},
                         location_score = ${match.location_score},
+                        time_score = ${match.time_score},
                         final_score = ${match.final_score},
                         updated_at = NOW()
                     WHERE id = ${existing[0].id}
                 `;
-                updatedCount++;
+                // إذا تحسنت النتيجة لتصبح محتملة (>= 60%) وكانت سابقاً أقل من ذلك، نرسل إشعاراً جديداً
+                if (match.final_score >= MATCH_SETTINGS.MIN_THRESHOLD && (existing[0].final_score || 0) < MATCH_SETTINGS.MIN_THRESHOLD) {
+                    const lostReport = await sql`SELECT title FROM reports WHERE id = ${match.lost_report_id}`;
+                    const foundReport = await sql`SELECT title FROM reports WHERE id = ${match.found_report_id}`;
+
+                    await notifyAdminsOfMatch(
+                        existing[0].id,
+                        lostReport[0]?.title || 'بلاغ مفقود',
+                        foundReport[0]?.title || 'بلاغ موجود',
+                        match.final_score
+                    );
+                    console.log(`📈 تحسنت النتيجة لتصبح تطابق محتمل (>= ${MATCH_SETTINGS.MIN_THRESHOLD * 100}%) - تم إرسال إشعار`);
+                }
             } else {
                 // تطابق جديد لم يكن موجوداً
                 const saved = await saveMatch(match);
                 if (saved) updatedCount++;
             }
+        }
+
+        if (updatedCount > 0) {
+            await sql`
+                UPDATE reports SET status = 'processing', updated_at = NOW()
+                WHERE id = ${reportId}
+            `;
         }
 
         console.log(`✅ تم تحديث/إنشاء ${updatedCount} تطابق`);
@@ -720,7 +803,8 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
         // 1. جلب بيانات البلاغين
         const reports = await sql`
             SELECT r.*, 
-                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images
+                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images,
+                ARRAY(SELECT description_ai FROM report_images WHERE report_id = r.id AND description_ai IS NOT NULL) as image_descriptions
             FROM reports r 
             WHERE r.id IN (${lostReportId}, ${foundReportId})
         `;
@@ -732,6 +816,10 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
 
         const lostReport = reports.find(r => r.id === lostReportId) as Report;
         const foundReport = reports.find(r => r.id === foundReportId) as Report;
+
+        // Ensure image_descriptions are handled correctly if NULL
+        lostReport.image_descriptions = (lostReport as any).image_descriptions || [];
+        foundReport.image_descriptions = (foundReport as any).image_descriptions || [];
 
         // 2. حساب نقاط التشابه (Text, Image, Location, Time)
 
@@ -753,13 +841,21 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
             }
         );
 
-        // ب. تشابه الصور
+        // ب. تشابه الصور (AI Descriptions preferred)
         let imageScore = 0;
-        const lostImages = lostReport.images || [];
-        const foundImages = foundReport.images || [];
+        const lDesc = (lostReport.image_descriptions || []).join(' ');
+        const fDesc = (foundReport.image_descriptions || []).join(' ');
 
-        if (lostImages.length > 0 && foundImages.length > 0) {
-            imageScore = await compareImageSets(lostImages, foundImages);
+        if (lDesc && fDesc) {
+            const descSimilarity = calculateTextSimilarity(lDesc, fDesc);
+            imageScore = descSimilarity.overall;
+        } else {
+            const lostImages = lostReport.images || [];
+            const foundImages = foundReport.images || [];
+
+            if (lostImages.length > 0 && foundImages.length > 0) {
+                imageScore = await compareImageSets(lostImages, foundImages);
+            }
         }
 
         // ج. تشابه الموقع
@@ -768,11 +864,13 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
         // د. تشابه الوقت
         const timeScore = calculateTimeScore(lostReport, foundReport);
 
-        // 3. حساب النتيجة النهائية
-        // 3. حساب النتيجة النهائية (المتوسط الحسابي: المجموع / العدد)
-        // كما طلب المستخدم: sum / count
-        const validScores = [textScore, imageScore, locationScore, timeScore];
-        const finalScore = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+        // 3. حساب النتيجة النهائية (المتوسط المرجح)
+        const finalScore = (
+            (imageScore * MATCH_SETTINGS.IMAGE_WEIGHT) +
+            (textScore * MATCH_SETTINGS.TEXT_WEIGHT) +
+            (locationScore * MATCH_SETTINGS.LOCATION_WEIGHT) +
+            (timeScore * MATCH_SETTINGS.TIME_WEIGHT)
+        );
 
         // 4. تحديث سجل التطابق الموجود
         const existing = await sql`
@@ -788,6 +886,7 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
                     image_score = ${Math.min(100, Math.round(imageScore * 100)) / 100},
                     text_score = ${Math.min(100, Math.round(textScore * 100)) / 100},
                     location_score = ${Math.min(100, Math.round(locationScore * 100)) / 100},
+                    time_score = ${Math.min(100, Math.round(timeScore * 100)) / 100},
                     final_score = ${Math.min(100, Math.round(finalScore * 100)) / 100},
                     updated_at = NOW()
                 WHERE id = ${existing[0].id}
@@ -798,12 +897,13 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
             result = await sql`
                 INSERT INTO ai_matches (
                     lost_report_id, found_report_id,
-                    image_score, text_score, location_score, final_score, status
+                    image_score, text_score, location_score, time_score, final_score, status
                 ) VALUES (
                     ${lostReportId}, ${foundReportId},
                     ${Math.min(100, Math.round(imageScore * 100)) / 100},
                     ${Math.min(100, Math.round(textScore * 100)) / 100},
                     ${Math.min(100, Math.round(locationScore * 100)) / 100},
+                    ${Math.min(100, Math.round(timeScore * 100)) / 100},
                     ${Math.min(100, Math.round(finalScore * 100)) / 100},
                     'pending'
                 )
@@ -811,8 +911,21 @@ export async function calculateMatchScorePair(lostReportId: string, foundReportI
             `;
         }
 
+        const savedMatch = result[0] as AIMatch;
+
+        // إرسال إشعار إذا كان التطابق عالياً (Manual Link)
+        if (finalScore >= MATCH_SETTINGS.MIN_THRESHOLD) {
+            await notifyAdminsOfMatch(
+                savedMatch.id,
+                lostReport.title || 'بلاغ مفقود',
+                foundReport.title || 'بلاغ موجود',
+                finalScore
+            );
+            console.log(`✅ [ForceMatch] تم إرسال إشعار للتطابق (>= ${MATCH_SETTINGS.MIN_THRESHOLD * 100}%)`);
+        }
+
         console.log(`✅ تمت إعادة حساب النتيجة: ${Math.min(100, Math.round(finalScore * 100))}%`);
-        return result[0] as AIMatch;
+        return savedMatch;
 
     } catch (error) {
         console.error('❌ خطأ في المقارنة الزوجية:', error);
@@ -934,4 +1047,130 @@ export async function runFullSystemMatching(): Promise<{ processed: number, matc
         console.error('❌ خطأ في الفحص الشامل:', error);
         return { processed: 0, matches: 0 };
     }
+}
+
+// ==================== Debug Helper ====================
+
+/**
+ * دالة التحليل الدقيق للتطابق (للمطورين)
+ * تعرض جميع المرشحين وتفاصيل درجاتهم حتى لو كانت منخفضة
+ */
+async function debugFindMatches(reportId: string) {
+    console.log('🐞 Debugging matches for:', reportId);
+    try {
+        let reports;
+        const isShortId = !isNaN(Number(reportId)) && !reportId.includes('-');
+
+        if (isShortId) {
+            reports = await sql`SELECT * FROM reports WHERE short_id = ${Number(reportId)}`;
+        } else {
+            reports = await sql`SELECT * FROM reports WHERE id = ${reportId}`;
+        }
+
+        if (reports.length === 0) return {
+            error: `err_report_not_found_${isShortId ? 'short' : 'id'}`,
+            params: { id: reportId }
+        };
+
+        const report = reports[0] as any;
+        const actualId = report.id; // Always the UUID
+
+        // جلب الصور أيضاً
+        const reportImages = await sql`SELECT image_url FROM report_images WHERE report_id = ${actualId}`;
+        report.images = reportImages.map((i: any) => i.image_url);
+
+        const competitorType = report.type === 'lost' ? 'found' : 'lost';
+
+        // جلب جميع المرشحين من النوع المعاكس
+        const candidates = await sql`
+            SELECT r.*, 
+                ARRAY(SELECT image_url FROM report_images WHERE report_id = r.id) as images,
+                ARRAY(SELECT description_ai FROM report_images WHERE report_id = r.id AND description_ai IS NOT NULL) as image_descriptions
+            FROM reports r
+            WHERE r.type = ${competitorType}
+            AND r.id != ${actualId}
+        `;
+
+        const results = [];
+
+        for (const candidate of candidates as any[]) {
+            // 1. حساب تشابه النص (20%)
+            const textScoreResult = await import('@/lib/textSimilarity').then(m => m.calculateTextSimilarity(
+                `${report.title} ${report.description} ${report.color || ''} ${report.distinguishing_marks || ''}`,
+                `${candidate.title} ${candidate.description} ${candidate.color || ''} ${candidate.distinguishing_marks || ''}`
+            ));
+            const textScore = textScoreResult.overall;
+
+            // 2. حساب تشافة الصور (50%)
+            let imageScore = 0;
+            let imageDetails: any = { method: 'none' };
+
+            const rImages = report.images || [];
+            const cImages = candidate.images || [];
+            const rDescs = (report as any).image_descriptions || [];
+            const cDescs = (candidate as any).image_descriptions || [];
+
+            if (rDescs.length > 0 && cDescs.length > 0) {
+                const textSim = await import('@/lib/textSimilarity').then(m => m.calculateTextSimilarity(rDescs.join(' '), cDescs.join(' ')));
+                imageScore = textSim.overall;
+                imageDetails = { method: 'AI-Description', similarity: textSim };
+            } else if (rImages.length > 0 && cImages.length > 0) {
+                const simResult = await import('@/lib/imageSimilarity').then(m => m.calculateImageSimilarity(rImages[0], cImages[0]));
+                imageDetails = { method: 'Visual-Hash', ...simResult };
+                imageScore = simResult.overall;
+            }
+
+            // 3. تشابه الموقع (20%)
+            const locationScore = calculateLocationScore(report, candidate as Report);
+
+            // 4. تشابه الوقت (10%)
+            const timeScore = calculateTimeScore(report, candidate as Report);
+
+            // النتيجة النهائية (المتوسط المرجح)
+            const finalScore = (
+                (imageScore * MATCH_SETTINGS.IMAGE_WEIGHT) +
+                (textScore * MATCH_SETTINGS.TEXT_WEIGHT) +
+                (locationScore * MATCH_SETTINGS.LOCATION_WEIGHT) +
+                (timeScore * MATCH_SETTINGS.TIME_WEIGHT)
+            );
+
+            results.push({
+                candidateId: candidate.id,
+                candidateTitle: candidate.title,
+                candidateStatus: candidate.status,
+                categoryMatch: report.category === candidate.category,
+                scores: {
+                    image: imageScore,
+                    text: textScore,
+                    location: locationScore,
+                    time: timeScore,
+                    final: finalScore
+                },
+                details: {
+                    imageCalculation: imageDetails,
+                    isPassThreshold: finalScore >= MATCH_SETTINGS.MIN_THRESHOLD
+                }
+            });
+        }
+
+        return {
+            report: { id: report.id, title: report.title, type: report.type, category: report.category },
+            candidatesFound: candidates.length,
+            matchingSettings: MATCH_SETTINGS,
+            analysis: results.sort((a, b) => b.scores.final - a.scores.final)
+        };
+
+    } catch (e: any) {
+        console.error('Debug error:', e);
+        return { error: e.message || String(e) };
+    }
+}
+
+// Attach to window for easy access from console or UI
+if (typeof window !== 'undefined') {
+    (window as any).debugFindMatches = debugFindMatches;
+    (window as any).forceMatchPair = async (lostId: string, foundId: string) => {
+        const { calculateMatchScorePair } = await import('./matchingService');
+        return await calculateMatchScorePair(lostId, foundId);
+    };
 }

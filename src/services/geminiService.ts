@@ -51,7 +51,7 @@ export async function generateImageDescriptionWithGemini(imageInput: File | Blob
         console.log('🤖 Starting Gemini Image Analysis...');
         const genAI = new GoogleGenerativeAI(API_KEY);
         // استخدام الموديل الأحدث والأكثر استقراراً
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const prompt = `
       You are an expert at identifying objects for a lost and found system.

@@ -50,7 +50,7 @@ export async function resetSystemData(): Promise<{ success: boolean; message: st
         // 8. تصفير صور المدراء (Admin Avatars)
         await sql`
             UPDATE users 
-            SET avatar_url = NULL 
+            SET avatar_url = NULL, cover_url = NULL
             WHERE role = 'admin'
         `;
         console.log('✅ Admin avatars reset.');

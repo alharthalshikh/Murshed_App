@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getContactInfo, ContactInfo, getActiveContacts } from '@/services/contactService';
 import { Contact } from '@/types/contact';
-import { Loader2, Phone, Facebook, Instagram, Youtube, MessagesSquare, X, Mail, MessageCircle } from 'lucide-react';
+import { Loader2, Phone, Facebook, Instagram, Youtube, MessagesSquare, X, Mail, MessageCircle, Ghost } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/context/LanguageContext';
@@ -157,6 +157,13 @@ export default function ContactPage() {
                                 icon={Youtube}
                                 label={t('subscribe_youtube')}
                                 colorClass="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20 hover:shadow-red-600/40"
+                            />
+
+                            <SocialButton
+                                href={info.snapchat_url}
+                                icon={Ghost}
+                                label={t('follow_snapchat') || "Snapchat"}
+                                colorClass="bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg shadow-yellow-400/20 hover:shadow-yellow-400/40"
                             />
                         </CardContent>
                     </Card>

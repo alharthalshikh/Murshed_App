@@ -39,6 +39,7 @@ export default function AdminContactPage() {
         instagram_url: '',
         youtube_url: '',
         whatsapp_group_url: '',
+        snapchat_url: '',
     });
 
     // Image Cropping State
@@ -294,6 +295,17 @@ export default function AdminContactPage() {
                                             id="youtube"
                                             value={socialData.youtube_url || ''}
                                             onChange={e => setSocialData({ ...socialData, youtube_url: e.target.value })}
+                                            dir="ltr"
+                                            className={cn("bg-card", isRtl ? "text-right" : "text-left")}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="snapchat">{t('snapchat_link_label') || "Snapchat Link"}</Label>
+                                        <Input
+                                            id="snapchat"
+                                            value={socialData.snapchat_url || ''}
+                                            onChange={e => setSocialData({ ...socialData, snapchat_url: e.target.value })}
                                             dir="ltr"
                                             className={cn("bg-card", isRtl ? "text-right" : "text-left")}
                                         />

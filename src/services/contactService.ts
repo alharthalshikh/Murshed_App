@@ -118,13 +118,14 @@ export interface ContactInfo {
     instagram_url?: string;
     youtube_url?: string;
     whatsapp_group_url?: string;
+    snapchat_url?: string;
 }
 
 export async function getContactInfo(): Promise<ContactInfo> {
     try {
         const result = await sql`
             SELECT key, value FROM system_settings 
-            WHERE key IN ('admin_name', 'admin_avatar', 'whatsapp_number', 'facebook_url', 'instagram_url', 'youtube_url', 'whatsapp_group_url')
+            WHERE key IN ('admin_name', 'admin_avatar', 'whatsapp_number', 'facebook_url', 'instagram_url', 'youtube_url', 'whatsapp_group_url', 'snapchat_url')
         `;
 
         const info: any = {};

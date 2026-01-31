@@ -413,6 +413,8 @@ export const translations = {
         facebook_link_label: 'رابط فيسبوك',
         instagram_link_label: 'رابط انستجرام',
         youtube_link_label: 'رابط يوتيوب',
+        snapchat_link_label: 'رابط سناب شات',
+        follow_snapchat: 'تابعنا على سناب شات',
         save_contact_success: 'تم حفظ معلومات التواصل بنجاح',
         save_contact_err: 'حدث خطأ أثناء الحفظ',
         upload_photo_success: 'تم رفع الصورة بنجاح',
